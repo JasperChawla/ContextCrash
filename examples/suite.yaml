@@ -1,0 +1,250 @@
+# ContextCrash example test suite
+# Run with: contextcrash run examples/suite.yaml
+
+suite:
+  name: "RAG Reliability Stress Test v1"
+  version: "1.0"
+  description: "Full adversarial suite covering all 8 failure categories"
+
+# Models to benchmark. LiteLLM format - mix providers freely.
+models:
+  - claude-haiku-4-5-20251001
+  - gpt-4o-mini
+
+judge_model: claude-haiku-4-5-20251001
+parallel_workers: 3
+db_path: "./data/results.duckdb"
+failure_threshold: 0.5
+
+# ITEM 6 — retrieval pipeline knobs (applied to all test cases unless overridden)
+retrieval:
+  chunk_size: 512
+  chunk_overlap: 50
+  top_k: 5
+  reranking_enabled: false
+  chunk_ordering: sequential
+
+defaults:
+  system_prompt: |
+    You are a helpful financial analyst assistant.
+    Answer questions using ONLY the provided context.
+    Always cite your sources using [1], [2], etc. notation.
+    If you cannot answer from the context, say "I don't have enough information."
+
+test_cases:
+
+  # ── 1. INSTRUCTION LOSS ──────────────────────────────────────────────────────
+  - name: "instruction_loss_citation_requirement"
+    failure_category: instruction_loss
+    perturbation: instruction_burial
+    perturbation_config:
+      depth: 0.85
+      padding_count: 6
+      instruction_chunk_index: 0
+    query: "What was the company's Q3 revenue and operating margin?"
+    expected_behavior: "Response must include citation markers [1] or [2] despite buried instructions"
+    chunks:
+      - "Q3 2024 revenue reached $1.47 billion, up 18% year-over-year."
+      - "Operating margin expanded to 26.3%, compared to 21.1% in Q3 2023."
+      - "The company increased R&D spending by $42 million to accelerate product development."
+    validators:
+      - type: contains_pattern
+        pattern: "\\[\\d+\\]"
+        description: "Must contain citation markers"
+        weight: 1.0
+    metadata:
+      severity: critical
+      owner: platform-team
+
+  # ── 2. RETRIEVAL OVERSHADOWING ───────────────────────────────────────────────
+  - name: "retrieval_overshadowing_query_ignored"
+    failure_category: retrieval_overshadowing
+    perturbation: distractor_injection
+    perturbation_config:
+      count: 4
+      seed: 7
+    query: "How many new markets did the company enter in Q3?"
+    expected_behavior: "Response should directly answer the market expansion question, not summarize all chunks"
+    chunks:
+      - "The company entered 3 new markets in Q3: Brazil, South Korea, and Poland."
+      - "Total revenue for the quarter was $1.47 billion."
+      - "Headcount grew by 340 employees during the quarter."
+      - "Customer satisfaction scores averaged 4.6 out of 5."
+    validators:
+      - type: contains_pattern
+        pattern: "(?:3|three)\\s+(?:new\\s+)?markets?"
+        description: "Must mention 3 new markets"
+    metadata:
+      severity: high
+
+  # ── 3. POSITION BIAS ─────────────────────────────────────────────────────────
+  - name: "position_bias_middle_chunk_critical"
+    failure_category: position_bias
+    perturbation: chunk_shuffle
+    perturbation_config:
+      seed: 13
+    query: "What are all the key financial metrics for Q3?"
+    expected_behavior: "Response should reference metrics from all chunks, not just first or last"
+    chunks:
+      - "Revenue: $1.47B (+18% YoY)."
+      - "Gross profit margin: 68.2%, up from 65.1% last year."
+      - "Free cash flow: $312 million for the quarter."
+      - "Net income: $187 million, up 31% from Q3 2023."
+    metadata:
+      severity: medium
+
+  # ── 4. ANSWER TRUNCATION ─────────────────────────────────────────────────────
+  - name: "answer_truncation_long_context"
+    failure_category: answer_truncation
+    perturbation: distractor_injection
+    perturbation_config:
+      count: 8
+      seed: 42
+    query: "Provide a comprehensive summary of all Q3 financial and operational highlights."
+    expected_behavior: "Response should be complete with proper ending, no mid-sentence cuts"
+    chunks:
+      - "Revenue of $1.47B exceeded analyst consensus of $1.41B by 4.3%."
+      - "Operating expenses were well-controlled at $380 million total."
+      - "The company repurchased $95 million in shares during the quarter."
+      - "Customer count grew 23% to 48,000 active enterprise accounts."
+    validators:
+      - type: ends_with_punctuation
+        description: "Response must end with proper punctuation"
+      - type: min_length
+        value: 100
+        description: "Response should be substantive, not cut off"
+    metadata:
+      severity: high
+
+  # ── 5. MULTI-TURN MEMORY DECAY ───────────────────────────────────────────────
+  - name: "memory_decay_contradicts_prior_turn"
+    failure_category: multi_turn_memory_decay
+    perturbation: history_contamination
+    perturbation_config:
+      false_turns:
+        - role: assistant
+          content: "Based on my earlier analysis, Q3 revenue was $800 million."
+      inject_at: 1
+    query: "Based on our conversation, what was Q3 revenue again?"
+    expected_behavior: "Model should use context chunks (actual $1.47B), not the contaminated history ($800M)"
+    history:
+      - role: user
+        content: "Can you help me analyze the Q3 earnings?"
+      - role: assistant
+        content: "Of course! I'll analyze the Q3 earnings report you've provided."
+    chunks:
+      - "Q3 2024 revenue: $1.47 billion (confirmed in the 10-Q filing)."
+      - "This represents 18% growth vs Q3 2023 revenue of $1.25 billion."
+    validators:
+      - type: contains_pattern
+        pattern: "1\\.47|1,470"
+        description: "Should reference the correct $1.47B figure from context"
+      - type: not_contains
+        pattern: "\\$800|800 million"
+        description: "Should not use the contaminated history figure"
+    metadata:
+      severity: critical
+
+  # ── 6. CONTRADICTION UNDER LONG CONTEXT ─────────────────────────────────────
+  - name: "contradiction_conflicting_data"
+    failure_category: contradiction_long_context
+    perturbation: conflicting_evidence
+    perturbation_config:
+      conflict_chunk: "[CONFLICTING DATA] Q3 revenue declined 12% to $1.1 billion due to market headwinds."
+      insert_at: 2
+    query: "Did Q3 revenue increase or decrease compared to last year?"
+    expected_behavior: "Model should acknowledge the contradicting data rather than silently picking one"
+    chunks:
+      - "Q3 2024 revenue reached $1.47 billion, up 18% year-over-year."
+      - "The growth was driven by strong enterprise sales and new market expansion."
+      - "Revenue has grown consistently for the past 7 consecutive quarters."
+    metadata:
+      severity: high
+
+  # ── 7. CITATION DRIFT ────────────────────────────────────────────────────────
+  - name: "citation_drift_wrong_source"
+    failure_category: citation_drift
+    perturbation: paraphrase_evidence
+    perturbation_config:
+      target_indices: [0, 2]
+    query: "What was the revenue and what drove the growth?"
+    expected_behavior: "Citations should correctly reference the chunks that contain the cited information"
+    chunks:
+      - "Q3 revenue was $1.47 billion, 18% above last year."
+      - "Growth was driven by a 23% increase in enterprise customer count."
+      - "New market expansion in Brazil, South Korea, and Poland contributed $89 million."
+    validators:
+      - type: contains_pattern
+        pattern: "\\[\\d+\\]"
+        description: "Response should use citation markers"
+    metadata:
+      severity: medium
+
+  # ── 8. HALLUCINATION UNDER OVERLOAD ─────────────────────────────────────────
+  - name: "hallucination_overload_stress_test"
+    failure_category: hallucination_overload
+    perturbation: distractor_injection
+    perturbation_config:
+      count: 10
+      seed: 99
+    query: "What specific percentage did operating margin reach, and what was free cash flow?"
+    expected_behavior: "Model should only state numbers that appear in the provided chunks, not invent figures"
+    chunks:
+      - "Operating margin: 26.3% for the quarter."
+      - "Free cash flow of $312 million, up from $241 million in Q3 2023."
+    validators:
+      - type: contains_pattern
+        pattern: "26\\.3|26\\.3%"
+        description: "Must use actual operating margin from context"
+      - type: contains_pattern
+        pattern: "312|\\$312"
+        description: "Must use actual FCF figure from context"
+    metadata:
+      severity: critical
+
+  # ── ITEM 6: CHUNK ORDERING VARIANTS ─────────────────────────────────────────
+  # These three cases run identical context but with different chunk orderings.
+  # Comparing results reveals whether the model exhibits position bias.
+
+  - name: "ordering_sequential_baseline"
+    failure_category: instruction_loss
+    perturbation: chunk_shuffle
+    chunk_ordering: sequential
+    query: "What were the key Q3 financial metrics?"
+    expected_behavior: "Response cites sources using [1] and covers all three metrics"
+    chunks:
+      - "Q3 revenue was $1.47B, up 18% YoY. [source: earnings release]"
+      - "Operating margin reached 26.3%, improving from 21.1% a year ago."
+      - "Free cash flow came in at $312M for the quarter."
+    validators:
+      - type: contains_pattern
+        pattern: "\\[\\d+\\]"
+        description: "Must include citation markers"
+    metadata:
+      severity: medium
+
+  - name: "ordering_reversed_stress"
+    failure_category: position_bias
+    perturbation: chunk_shuffle
+    chunk_ordering: reversed
+    query: "What financial data is available for Q3?"
+    expected_behavior: "Model correctly uses all data despite reversed chunk order"
+    chunks:
+      - "Q3 revenue was $1.47B, up 18% YoY."
+      - "Operating margin reached 26.3%, improving from 21.1% a year ago."
+      - "Free cash flow came in at $312M for the quarter."
+    metadata:
+      severity: medium
+
+  - name: "ordering_random_robustness"
+    failure_category: position_bias
+    perturbation: chunk_shuffle
+    chunk_ordering: random
+    query: "Summarize all available Q3 financial metrics."
+    expected_behavior: "Model answers correctly regardless of randomised chunk order"
+    chunks:
+      - "Q3 revenue was $1.47B, up 18% YoY."
+      - "Operating margin reached 26.3%, improving from 21.1% a year ago."
+      - "Free cash flow came in at $312M for the quarter."
+    metadata:
+      severity: medium
