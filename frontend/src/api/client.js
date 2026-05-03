@@ -1,6 +1,9 @@
 import axios from 'axios'
 
-const BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000'
+// Empty string = same-origin (correct in production where the backend serves
+// the frontend).  Set VITE_API_URL to override during development if you are
+// not using the Vite dev proxy (e.g. VITE_API_URL=http://localhost:8000).
+const BASE = import.meta.env.VITE_API_URL ?? ''
 
 const api = axios.create({ baseURL: BASE, timeout: 120_000 })
 
