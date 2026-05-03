@@ -1,0 +1,462 @@
+# ContextCrash — Advanced Demo Suite
+# Run with: py -m cli.main run examples/advanced_suite.yaml
+#
+# NOTE: This file contains SYNTHETIC adversarial benchmark data for
+# reproducible local demos. All company names, figures, and quotes
+# are fictional. Do not use results to compare real model providers.
+#
+# Key difference from suite.yaml:
+#   - 19 test cases (vs 11) covering all 8 failure categories more deeply
+#   - 5 test cases include context_depth_levels for degradation curve data
+#   - Chunk ordering variants (sequential / reversed / random) included
+#   - Larger distractor counts stress-test retrieval more aggressively
+
+suite:
+  name: "RAG Reliability Advanced Suite"
+  version: "1.0"
+  description: "Extended adversarial suite with depth-level degradation testing"
+
+models:
+  - claude-haiku-4-5-20251001
+  - gpt-4o-mini
+
+judge_model: claude-haiku-4-5-20251001
+parallel_workers: 3
+db_path: "./data/results.duckdb"
+failure_threshold: 0.5
+
+retrieval:
+  chunk_size: 512
+  chunk_overlap: 50
+  top_k: 5
+  reranking_enabled: false
+  chunk_ordering: sequential
+
+defaults:
+  system_prompt: |
+    You are a technical product analyst for a cloud infrastructure company.
+    Answer questions using ONLY the provided context.
+    Always cite your sources using [1], [2], etc. notation.
+    If information is absent from the context, explicitly state that.
+
+test_cases:
+
+  # ── INSTRUCTION LOSS ─────────────────────────────────────────────────────────
+  # context_depth_levels: validator checks for a figure only in chunk 3,
+  # so shallow context (25%, 50%) cannot satisfy it → produces degradation.
+
+  - name: "instruction_loss_citation_deep_context"
+    failure_category: instruction_loss
+    perturbation: instruction_burial
+    perturbation_config:
+      depth: 0.90
+      padding_count: 8
+      instruction_chunk_index: 0
+    query: "What was the platform uptime SLA achieved in Q2, and what drove it?"
+    expected_behavior: "Response must cite sources with [1] or [2] and reference the uptime figure"
+    context_depth_levels: [0.25, 0.5, 0.75, 1.0]
+    chunks:
+      - "Infrastructure operations are governed by a 99.9% SLA commitment per contract."
+      - "The SRE team conducted 14 incident reviews and implemented 8 architectural improvements."
+      - "Q2 platform uptime reached 99.97%, exceeding the contractual SLA by 0.07 percentage points."
+      - "Uptime improvement was driven by the new circuit-breaker rollout across all 6 availability zones."
+    validators:
+      - type: contains_pattern
+        pattern: "\\[\\d+\\]"
+        description: "Citation markers required"
+        weight: 0.6
+      - type: contains_pattern
+        pattern: "99\\.97|99\\.9[67]"
+        description: "Must reference the actual uptime figure from chunk 3"
+        weight: 0.4
+    metadata:
+      severity: critical
+
+  - name: "instruction_loss_format_requirement"
+    failure_category: instruction_loss
+    perturbation: instruction_burial
+    perturbation_config:
+      depth: 0.80
+      padding_count: 5
+      instruction_chunk_index: 0
+    query: "List the top three cost drivers for Q2 infrastructure spend."
+    expected_behavior: "Response must include citation markers and present a numbered or bulleted list"
+    chunks:
+      - "Compute costs were $4.2M, up 11% due to new GPU cluster provisioning."
+      - "Egress bandwidth costs rose 18% to $1.8M following the CDN migration."
+      - "Storage costs decreased 6% to $0.9M after the cold-tier data archival project."
+      - "License costs remained flat at $1.1M across all cloud provider agreements."
+    validators:
+      - type: contains_pattern
+        pattern: "\\[\\d+\\]"
+        description: "Must cite sources"
+      - type: contains_pattern
+        pattern: "(?:compute|bandwidth|storage|egress)"
+        description: "Must mention at least one cost category"
+    metadata:
+      severity: high
+
+  # ── RETRIEVAL OVERSHADOWING ───────────────────────────────────────────────────
+  # context_depth_levels: critical answer is in chunk 3; at 25% depth model
+  # only has background noise → cannot answer → low score.
+
+  - name: "retrieval_overshadowing_signal_buried"
+    failure_category: retrieval_overshadowing
+    perturbation: distractor_injection
+    perturbation_config:
+      count: 6
+      seed: 17
+    query: "How many regions achieved sub-50ms p99 API latency in Q2?"
+    expected_behavior: "Response should directly state the number of regions, not summarize all context"
+    context_depth_levels: [0.25, 0.5, 0.75, 1.0]
+    chunks:
+      - "Global API gateway handles 2.4 billion requests per day across all regions."
+      - "The observability stack was upgraded to collect 99th-percentile latency metrics."
+      - "Seven regions achieved sub-50ms p99 API latency in Q2, up from four in Q1."
+      - "The three remaining regions are scheduled for gateway upgrades in Q3 and Q4."
+    validators:
+      - type: contains_pattern
+        pattern: "(?:7|seven)\\s+regions?"
+        description: "Must state the correct count of 7 regions"
+        weight: 0.7
+      - type: contains_pattern
+        pattern: "\\[\\d+\\]"
+        description: "Citation required"
+        weight: 0.3
+    metadata:
+      severity: high
+
+  - name: "retrieval_overshadowing_noise_dominates"
+    failure_category: retrieval_overshadowing
+    perturbation: distractor_injection
+    perturbation_config:
+      count: 10
+      seed: 88
+    query: "What was the mean time to recovery (MTTR) for P1 incidents in Q2?"
+    expected_behavior: "Response should state the MTTR figure, not get lost in distractor content"
+    chunks:
+      - "Incident management follows a tiered severity model: P1 through P4."
+      - "P1 MTTR for Q2 was 23 minutes, down from 41 minutes in Q1 — a 44% improvement."
+      - "Post-incident reviews are mandatory for all P1 and P2 events within 72 hours."
+    validators:
+      - type: contains_pattern
+        pattern: "23|twenty.three"
+        description: "Must state the correct MTTR of 23 minutes"
+    metadata:
+      severity: high
+
+  # ── POSITION BIAS ─────────────────────────────────────────────────────────────
+  # context_depth_levels: at 25% depth only chunk 1 (background) is present;
+  # key metric in chunk 3 is unavailable → score drops.
+
+  - name: "position_bias_full_context_required"
+    failure_category: position_bias
+    perturbation: chunk_shuffle
+    perturbation_config:
+      seed: 31
+    query: "What are all the key Q2 platform reliability metrics?"
+    expected_behavior: "Response should reference metrics from all chunks, not only first or last"
+    context_depth_levels: [0.25, 0.5, 0.75, 1.0]
+    chunks:
+      - "Availability: 99.97% platform uptime — best quarter in company history."
+      - "Latency: p50 API response time of 18ms, p99 of 47ms across all endpoints."
+      - "Throughput: peak traffic of 340,000 requests per second handled without degradation."
+      - "Error rate: 0.003% server-side error rate, down 61% from Q2 last year."
+    validators:
+      - type: contains_pattern
+        pattern: "99\\.97|uptime"
+        description: "Must mention availability from chunk 1"
+        weight: 0.25
+      - type: contains_pattern
+        pattern: "latency|47ms|18ms"
+        description: "Must mention latency from chunk 2"
+        weight: 0.25
+      - type: contains_pattern
+        pattern: "340,000|throughput"
+        description: "Must mention throughput from chunk 3"
+        weight: 0.25
+      - type: contains_pattern
+        pattern: "0\\.003|error.rate"
+        description: "Must mention error rate from chunk 4"
+        weight: 0.25
+    metadata:
+      severity: medium
+
+  - name: "position_bias_sequential_baseline"
+    failure_category: position_bias
+    perturbation: chunk_shuffle
+    chunk_ordering: sequential
+    query: "Summarize all Q2 infrastructure performance highlights."
+    expected_behavior: "Model correctly uses all 4 performance metrics in sequential chunk order"
+    chunks:
+      - "Uptime: 99.97% — best quarter on record."
+      - "API latency p99: 47ms globally."
+      - "Peak throughput: 340,000 RPS sustained for 6 hours."
+      - "Error rate: 0.003%, down 61% year-over-year."
+    metadata:
+      severity: medium
+
+  - name: "position_bias_reversed_stress"
+    failure_category: position_bias
+    perturbation: chunk_shuffle
+    chunk_ordering: reversed
+    query: "What infrastructure metrics improved most in Q2?"
+    expected_behavior: "Model correctly uses data despite reversed chunk order"
+    chunks:
+      - "Uptime: 99.97% — best quarter on record."
+      - "API latency p99: 47ms globally."
+      - "Peak throughput: 340,000 RPS sustained for 6 hours."
+      - "Error rate: 0.003%, down 61% year-over-year."
+    metadata:
+      severity: medium
+
+  - name: "position_bias_random_robustness"
+    failure_category: position_bias
+    perturbation: chunk_shuffle
+    chunk_ordering: random
+    query: "List every Q2 performance figure you can find in the context."
+    expected_behavior: "Model references all four metrics regardless of random ordering"
+    chunks:
+      - "Uptime: 99.97% — best quarter on record."
+      - "API latency p99: 47ms globally."
+      - "Peak throughput: 340,000 RPS sustained for 6 hours."
+      - "Error rate: 0.003%, down 61% year-over-year."
+    metadata:
+      severity: medium
+
+  # ── ANSWER TRUNCATION ─────────────────────────────────────────────────────────
+
+  - name: "answer_truncation_comprehensive_summary"
+    failure_category: answer_truncation
+    perturbation: distractor_injection
+    perturbation_config:
+      count: 12
+      seed: 55
+    query: "Provide a complete summary of all Q2 infrastructure costs, reliability metrics, and engineering milestones."
+    expected_behavior: "Response should be comprehensive and end with proper punctuation, not cut off"
+    chunks:
+      - "Infrastructure spend totalled $8.0M in Q2, within the $8.5M budget."
+      - "Reliability: 99.97% uptime, p99 latency 47ms, error rate 0.003%."
+      - "Engineering shipped 3 major features: circuit-breaker rollout, CDN migration, cold-tier archival."
+      - "Headcount grew by 4 engineers; total SRE team is now 22 full-time staff."
+    validators:
+      - type: ends_with_punctuation
+        description: "Response must end cleanly, not mid-sentence"
+      - type: min_length
+        value: 120
+        description: "Must be a substantive summary"
+    metadata:
+      severity: high
+
+  - name: "answer_truncation_minimal_context"
+    failure_category: answer_truncation
+    perturbation: distractor_injection
+    perturbation_config:
+      count: 4
+      seed: 22
+    query: "What was total Q2 infrastructure spend, and was it within budget?"
+    expected_behavior: "Response should be complete and confirm the budget figure"
+    chunks:
+      - "Q2 infrastructure budget was $8.5M, approved in the annual planning cycle."
+      - "Actual Q2 spend came in at $8.0M — $500K under budget."
+    validators:
+      - type: contains_pattern
+        pattern: "8\\.0|8,0|8\\.5|budget"
+        description: "Must reference the spend or budget figures"
+      - type: ends_with_punctuation
+        description: "Response must end with proper punctuation"
+    metadata:
+      severity: medium
+
+  # ── MULTI-TURN MEMORY DECAY ────────────────────────────────────────────────────
+  # context_depth_levels: correct figure is in chunk 4 (deepest); at 25% depth
+  # the model cannot reference it → should score lower.
+
+  - name: "memory_decay_context_span"
+    failure_category: multi_turn_memory_decay
+    perturbation: history_contamination
+    perturbation_config:
+      false_turns:
+        - role: assistant
+          content: "Based on earlier data I reviewed, Q2 uptime was approximately 98.5%."
+      inject_at: 1
+    query: "What was the confirmed Q2 uptime figure from the infrastructure report?"
+    expected_behavior: "Model should use chunk data (99.97%), not the contaminated history (98.5%)"
+    context_depth_levels: [0.25, 0.5, 0.75, 1.0]
+    history:
+      - role: user
+        content: "I need to prepare the Q2 reliability report."
+      - role: assistant
+        content: "Sure, I can help you compile the Q2 reliability metrics."
+    chunks:
+      - "The Q2 infrastructure review covers the period April 1 through June 30."
+      - "SLA compliance was tracked weekly by the SRE on-call rotation."
+      - "Internal dashboards recorded all uptime events in the observability platform."
+      - "Confirmed Q2 platform uptime: 99.97%, verified against the monitoring system."
+    validators:
+      - type: contains_pattern
+        pattern: "99\\.97"
+        description: "Must use the correct 99.97% figure from context"
+        weight: 0.6
+      - type: not_contains
+        pattern: "98\\.5"
+        description: "Must not use the contaminated 98.5% figure from history"
+        weight: 0.4
+    metadata:
+      severity: critical
+
+  - name: "memory_decay_history_contamination"
+    failure_category: multi_turn_memory_decay
+    perturbation: history_contamination
+    perturbation_config:
+      false_turns:
+        - role: assistant
+          content: "As I mentioned, the team processed 22 incidents in Q2."
+      inject_at: 2
+    query: "How many P1 and P2 incidents were there in Q2 total?"
+    expected_behavior: "Model should report from chunks (18 total), not from contaminated history (22)"
+    history:
+      - role: user
+        content: "Can you help me prepare the incident report for Q2?"
+      - role: assistant
+        content: "Of course. Let me review the Q2 incident data."
+    chunks:
+      - "Q2 incident summary: 7 P1 incidents, 11 P2 incidents, 34 P3 incidents."
+      - "P1 count decreased from 12 in Q1 to 7 in Q2, a 42% improvement."
+    validators:
+      - type: contains_pattern
+        pattern: "18|eighteen|7.*11|11.*7"
+        description: "Must reference 18 total (7 P1 + 11 P2) or individual counts"
+      - type: not_contains
+        pattern: "22|twenty.two"
+        description: "Must not use the contaminated count from history"
+    metadata:
+      severity: critical
+
+  # ── CONTRADICTION UNDER LONG CONTEXT ──────────────────────────────────────────
+
+  - name: "contradiction_silent_selection"
+    failure_category: contradiction_long_context
+    perturbation: conflicting_evidence
+    perturbation_config:
+      conflict_chunk: "[CONFLICTING DATA] Q2 platform uptime was 98.2%, below the 99.9% SLA threshold — a significant breach requiring customer notification."
+      insert_at: 2
+    query: "Did the platform meet its SLA in Q2?"
+    expected_behavior: "Model should acknowledge the contradicting data rather than silently picking one version"
+    chunks:
+      - "Q2 platform uptime: 99.97%, exceeding the 99.9% SLA by a comfortable margin."
+      - "The SRE team confirmed no SLA breach events occurred during the quarter."
+      - "Infrastructure operations are covered by a 99.9% uptime SLA per all enterprise contracts."
+    metadata:
+      severity: high
+
+  - name: "contradiction_explicit_conflict"
+    failure_category: contradiction_long_context
+    perturbation: conflicting_evidence
+    perturbation_config:
+      conflict_chunk: "[REVISION] The CDN migration budget was actually $2.1M, not $1.8M — revised after post-project accounting."
+      insert_at: 1
+    query: "What was the final cost of the CDN migration project?"
+    expected_behavior: "Model should flag that conflicting figures appear in the context"
+    chunks:
+      - "The CDN migration was completed in Q2, improving global delivery speeds by 34%."
+      - "CDN migration total cost: $1.8M, within the $2.0M approved budget."
+      - "The project team received a delivery award for on-time completion."
+    metadata:
+      severity: medium
+
+  # ── CITATION DRIFT ────────────────────────────────────────────────────────────
+
+  - name: "citation_drift_paraphrased_sources"
+    failure_category: citation_drift
+    perturbation: paraphrase_evidence
+    perturbation_config:
+      target_indices: [0, 2]
+    query: "What drove the 34% improvement in global delivery speeds, and what did it cost?"
+    expected_behavior: "Citations should correctly map to the chunks containing the cited information"
+    chunks:
+      - "The CDN migration was finalized in Q2, resulting in a 34% improvement in global delivery speeds."
+      - "Edge node deployment expanded from 12 to 28 points of presence worldwide."
+      - "CDN migration total cost: $1.8M, within the approved $2.0M project budget."
+    validators:
+      - type: contains_pattern
+        pattern: "\\[\\d+\\]"
+        description: "Must use citation markers"
+      - type: contains_pattern
+        pattern: "34|CDN|migration"
+        description: "Must reference the migration or its performance improvement"
+    metadata:
+      severity: medium
+
+  - name: "citation_drift_invented_reference"
+    failure_category: citation_drift
+    perturbation: paraphrase_evidence
+    perturbation_config:
+      target_indices: [1]
+    query: "What is the p99 API latency and which team is responsible for it?"
+    expected_behavior: "Citations should only reference chunks that exist — no invented sources"
+    context_depth_levels: [0.25, 0.5, 0.75, 1.0]
+    chunks:
+      - "API performance is monitored by the Platform Engineering team."
+      - "p99 latency across all endpoints: 47ms, measured over a 30-day rolling window."
+      - "The Platform Engineering team owns all latency SLOs and on-call responsibilities."
+      - "Latency targets are reviewed quarterly and published in the SLA documentation."
+    validators:
+      - type: contains_pattern
+        pattern: "\\[\\d+\\]"
+        description: "Must use citation markers"
+      - type: contains_pattern
+        pattern: "47ms|47 ms"
+        description: "Must cite the correct latency figure"
+    metadata:
+      severity: medium
+
+  # ── HALLUCINATION UNDER OVERLOAD ──────────────────────────────────────────────
+
+  - name: "hallucination_overload_exact_figures"
+    failure_category: hallucination_overload
+    perturbation: distractor_injection
+    perturbation_config:
+      count: 12
+      seed: 77
+    query: "What was total Q2 compute spend and what was the peak RPS handled?"
+    expected_behavior: "Model should only state figures present in context — no invented numbers"
+    context_depth_levels: [0.25, 0.5, 0.75, 1.0]
+    chunks:
+      - "Infrastructure spend breakdown is published quarterly in the FinOps dashboard."
+      - "Compute costs totalled $4.2M in Q2, driven by GPU cluster provisioning."
+      - "Storage and egress costs were $1.8M and $0.9M respectively."
+      - "Peak throughput of 340,000 requests per second was sustained for a 6-hour window."
+    validators:
+      - type: contains_pattern
+        pattern: "4\\.2|\\$4\\.2"
+        description: "Must state the correct compute cost of $4.2M from chunk 2"
+        weight: 0.5
+      - type: contains_pattern
+        pattern: "340,000|340000"
+        description: "Must state the correct peak RPS of 340,000 from chunk 4"
+        weight: 0.5
+    metadata:
+      severity: critical
+
+  - name: "hallucination_overload_vague_context"
+    failure_category: hallucination_overload
+    perturbation: distractor_injection
+    perturbation_config:
+      count: 8
+      seed: 44
+    query: "What specific SLA percentage was agreed with enterprise customers, and was it met?"
+    expected_behavior: "Model should state only figures from context and not invent SLA numbers"
+    chunks:
+      - "Enterprise SLA: 99.9% monthly uptime guaranteed under all standard contracts."
+      - "Q2 actual uptime: 99.97% — 0.07 percentage points above the contractual minimum."
+      - "No SLA credit events were triggered during the quarter."
+    validators:
+      - type: contains_pattern
+        pattern: "99\\.9[%\\s]|99\\.9\\s"
+        description: "Must reference the actual SLA percentage"
+      - type: contains_pattern
+        pattern: "99\\.97|exceeded|above"
+        description: "Must state that SLA was met or exceeded"
+    metadata:
+      severity: high

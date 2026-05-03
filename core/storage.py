@@ -381,6 +381,50 @@ class ResultStorage:
             """, [run_id])
             return self._to_dicts(cursor)
 
+    # ── cleanup ops ───────────────────────────────────────────────────────────
+
+    def delete_stale_runs(self) -> int:
+        """Delete runs that have no summaries (model_count=0 / test_count=0).
+
+        These are typically runs created before a schema fix where results were
+        lost, or runs that failed before any data was written.
+        Returns the number of run records deleted.
+        """
+        _RESULT_TABLES = [
+            "test_results", "run_summaries",
+            "model_cost_summaries", "depth_scores",
+        ]
+        with self._conn() as conn:
+            stale = [r[0] for r in conn.execute("""
+                SELECT r.run_id
+                FROM test_runs r
+                LEFT JOIN run_summaries s USING (run_id)
+                WHERE s.run_id IS NULL
+            """).fetchall()]
+
+            if not stale:
+                return 0
+
+            for table in _RESULT_TABLES:
+                for run_id in stale:
+                    conn.execute(f"DELETE FROM {table} WHERE run_id = ?", [run_id])
+            for run_id in stale:
+                conn.execute("DELETE FROM test_runs WHERE run_id = ?", [run_id])
+
+            return len(stale)
+
+    def delete_all_runs(self) -> int:
+        """Delete every row from all run-data tables. Returns number of runs deleted."""
+        _ALL_TABLES = [
+            "test_results", "run_summaries",
+            "model_cost_summaries", "depth_scores", "test_runs",
+        ]
+        with self._conn() as conn:
+            count = conn.execute("SELECT COUNT(*) FROM test_runs").fetchone()[0]
+            for table in _ALL_TABLES:
+                conn.execute(f"DELETE FROM {table}")
+            return count
+
     def get_schema(self) -> List[dict]:
         """Returns all table names and their columns — used for the final check."""
         with self._conn() as conn:

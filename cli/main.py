@@ -127,6 +127,45 @@ def run(suite_file: str, db: str | None, models: str | None, output: str):
             _print_cost_breakdown(storage, run_id)
 
 
+@cli.command("cleanup-runs")
+@click.option("--db", default="./data/results.duckdb", help="DuckDB path")
+@click.option("--stale-only", "stale_only", is_flag=True,
+              help="Remove only runs with no results (0 models / 0 tests)")
+@click.option("--all", "all_runs", is_flag=True,
+              help="Remove ALL run data — clears the entire local database")
+def cleanup_runs(db: str, stale_only: bool, all_runs: bool):
+    """Remove stale or all local benchmark runs from DuckDB.
+
+    \b
+    Safe clean-up of runs left over from schema migrations or failed runs:
+        contextcrash cleanup-runs --stale-only
+
+    \b
+    Nuclear option — clears everything:
+        contextcrash cleanup-runs --all
+    """
+    if not stale_only and not all_runs:
+        console.print("[yellow]Specify --stale-only or --all.[/yellow]")
+        console.print("  --stale-only  remove runs with 0 models or 0 tests (safe)")
+        console.print("  --all         remove ALL run data (irreversible)")
+        return
+
+    storage = ResultStorage(db)
+
+    if stale_only:
+        removed = storage.delete_stale_runs()
+        if removed:
+            console.print(f"[green]Removed {removed} stale run(s) with no result data.[/green]")
+        else:
+            console.print("[dim]No stale runs found.[/dim]")
+
+    if all_runs:
+        console.print("[bold red]WARNING: deleting ALL local benchmark run data from "
+                      f"{db}[/bold red]")
+        removed = storage.delete_all_runs()
+        console.print(f"[red]Deleted {removed} run(s) and all associated rows.[/red]")
+
+
 @cli.command()
 @click.argument("baseline")
 @click.argument("candidate")

@@ -88,16 +88,32 @@ export default function Sidebar({ runs, selectedRunId, onSelectRun }) {
         <div style={{ fontSize: '10px', fontWeight: 600, letterSpacing: '0.07em', color: '#71717A', textTransform: 'uppercase', marginBottom: '6px' }}>
           Navigation
         </div>
-        {['Dashboard', 'API Docs', 'Settings'].map(item => (
-          <div
-            key={item}
-            style={{ fontSize: '12px', color: '#71717A', padding: '4px 8px', cursor: 'pointer', borderRadius: '4px' }}
-            onMouseEnter={e => { e.currentTarget.style.color = '#E4E4E7' }}
-            onMouseLeave={e => { e.currentTarget.style.color = '#71717A' }}
-          >
-            {item}
-          </div>
-        ))}
+
+        <div
+          style={{ fontSize: '12px', color: '#71717A', padding: '4px 8px', cursor: 'pointer', borderRadius: '4px' }}
+          onClick={() => window.location.href = '/'}
+          onMouseEnter={e => { e.currentTarget.style.color = '#E4E4E7' }}
+          onMouseLeave={e => { e.currentTarget.style.color = '#71717A' }}
+        >
+          Dashboard
+        </div>
+
+        <div
+          style={{ fontSize: '12px', color: '#71717A', padding: '4px 8px', cursor: 'pointer', borderRadius: '4px' }}
+          onClick={() => window.open('http://127.0.0.1:8000/docs', '_blank')}
+          onMouseEnter={e => { e.currentTarget.style.color = '#E4E4E7' }}
+          onMouseLeave={e => { e.currentTarget.style.color = '#71717A' }}
+        >
+          API Docs
+        </div>
+
+        <div
+          title="Settings — coming soon"
+          style={{ fontSize: '12px', color: '#3F3F46', padding: '4px 8px', borderRadius: '4px', cursor: 'default', display: 'flex', alignItems: 'center', gap: '6px' }}
+        >
+          Settings
+          <span style={{ fontSize: '9px', fontStyle: 'italic' }}>soon</span>
+        </div>
       </div>
     </aside>
   )

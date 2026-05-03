@@ -1,164 +1,127 @@
 # ContextCrash
 
-Adversarial reliability benchmarking for LLM-powered RAG pipelines. Define a test suite in YAML, run it against Claude/GPT-4o/Gemini simultaneously, get a failure heatmap and regression delta.
+Adversarial reliability benchmarking dashboard for LLM-powered RAG pipelines.
+Define a test suite in YAML, run it against multiple models, and explore a failure heatmap, degradation curve, and regression delta in a local React dashboard.
+
+---
+
+## Demo data vs live provider data
+
+The included example suites contain **synthetic adversarial benchmark data** -- fictional company names, figures, and scenarios designed for reproducible local demos without requiring real API keys or sensitive data.
+
+When real provider API keys are configured (see Setup), the same CLI, storage, and dashboard pipeline visualises live results from real model calls. The included examples should **not** be used to claim one provider is universally better than another.
 
 ---
 
 ## Architecture
 
-```
-┌──────────────────────────────────────────────────────────────┐
-│                        ContextCrash                          │
-└─────────────────────────┬────────────────────────────────────┘
-                          │
-          ┌───────────────┴────────────────┐
-          ▼                                ▼
-    ┌──────────┐                    ┌────────────┐
-    │   CLI    │                    │  Web UI    │
-    │ (click + │                    │ (React +   │
-    │  rich)   │                    │  D3.js)    │
-    └────┬─────┘                    └─────┬──────┘
-         │                                │
-         └───────────────┬────────────────┘
-                         │
-                ┌────────▼────────┐
-                │  FastAPI Server │
-                │  /runs  /results│
-                └────────┬────────┘
-                         │
-          ┌──────────────┼──────────────┐
-          ▼              ▼              ▼
-  ┌──────────────┐ ┌──────────┐ ┌────────────┐
-  │ Test Runner  │ │ DuckDB   │ │ Aggregator │
-  │  (asyncio)   │ │ storage  │ │ summaries  │
-  │  semaphore   │ │          │ │ + deltas   │
-  └──────┬───────┘ └──────────┘ └────────────┘
-         │
-   ┌─────┴──────────────────────────────────┐
-   │                                        │
-   ▼                                        ▼
-┌──────────────────┐              ┌─────────────────────┐
-│  Perturbations   │              │     Evaluators      │
-│                  │              │                     │
-│ chunk_shuffle    │              │ deterministic rules │
-│ distractor_inject│              │  (cheap, runs first)│
-│ conflicting_evid │              │                     │
-│ instruction_bury │              │ LLM judge           │
-│ history_contamin │              │  (only if ambiguous)│
-│ paraphrase_evid  │              │                     │
-└──────────────────┘              │ disagreement tracker│
-                                  └─────────────────────┘
-                                          │
-                     ┌────────────────────┘
-                     ▼
-              ┌─────────────────────────────┐
-              │          LiteLLM            │
-              │  claude  │  gpt-4o  │ gemini│
-              └─────────────────────────────┘
-```
+
 
 ---
 
-## Failure Taxonomy
+## Failure taxonomy
 
 | Category | What it tests |
 |---|---|
-| `instruction_loss` | Model ignores system prompt instructions under long context |
-| `retrieval_overshadowing` | Retrieved chunks dominate response; actual query ignored |
-| `position_bias` | Model overweights first/last chunks, ignores middle content |
-| `answer_truncation` | Response cuts off mid-sentence due to token pressure |
-| `multi_turn_memory_decay` | Earlier conversation context forgotten or contradicted |
-| `contradiction_long_context` | Conflicting evidence silently picked vs. flagged |
-| `citation_drift` | Citations don't map to the actual source chunks |
-| `hallucination_overload` | Model fabricates facts not present in any chunk |
+| instruction_loss | Model ignores system-prompt instructions under long context |
+| retrieval_overshadowing | Retrieved chunks dominate; the actual query is ignored |
+| position_bias | Model overweights first/last chunks, misses middle content |
+| answer_truncation | Response cuts off mid-sentence under token pressure |
+| multi_turn_memory_decay | Earlier conversation context forgotten or contradicted |
+| contradiction_long_context | Conflicting evidence silently selected rather than flagged |
+| citation_drift | Citations do not map to the actual source chunks |
+| hallucination_overload | Model fabricates facts not present in any chunk |
 
 ---
 
 ## Setup
 
-### 1. Install
-
 ```bash
 git clone <repo>
 cd contextcrash
 python -m venv venv
-source venv/bin/activate  # Windows: venv\Scripts\activate
-
+source venv/bin/activate        # Windows: venv\Scriptsctivate
 pip install -e .
 ```
 
-### 2. Configure API keys
+### API keys (optional for included examples)
 
 ```bash
 cp .env.example .env
-# Edit .env with your keys
-```
-
-Or export directly:
-```bash
-export ANTHROPIC_API_KEY=sk-ant-...
-export OPENAI_API_KEY=sk-...
-```
-
-### 3. Run your first suite
-
-```bash
-contextcrash run examples/suite.yaml
-```
-
-### 4. Compare two configurations
-
-```bash
-contextcrash compare examples/baseline.yaml examples/candidate.yaml
+# Add ANTHROPIC_API_KEY and/or OPENAI_API_KEY
 ```
 
 ---
 
-## CLI Reference
+## Quick start
 
+### Basic suite -- populates metric cards and heatmap
+
+```bash
+py -m cli.main run examples/suite.yaml
 ```
-contextcrash run SUITE_FILE [OPTIONS]
 
-  Options:
-    --db PATH          Override DuckDB path (default: from suite config)
-    --models TEXT      Comma-separated model overrides
-    --output [rich|json]
+### Advanced suite -- populates metric cards, heatmap, and degradation curve
 
-contextcrash compare BASELINE_FILE CANDIDATE_FILE [OPTIONS]
+The advanced suite includes context_depth_levels: [0.25, 0.5, 0.75, 1.0] on selected
+test cases. This triggers extra model calls at 25/50/75/100 percent of the full
+context window, producing the per-model degradation curves in the dashboard.
 
-  Options:
-    --db PATH
-    --output [rich|json]
+```bash
+py -m cli.main run examples/advanced_suite.yaml
+```
+
+### Compare two runs
+
+```bash
+py -m cli.main compare examples/suite.yaml examples/advanced_suite.yaml
 ```
 
 ---
 
-## Web UI
+## CLI reference
 
-### Development
+```
+py -m cli.main run SUITE_FILE [--db PATH] [--models a,b] [--output rich|json]
+py -m cli.main compare BASELINE CANDIDATE [--db PATH] [--output rich|json]
+py -m cli.main cleanup-runs [--db PATH] [--stale-only] [--all]
+```
+
+### cleanup-runs
+
+Remove stale or all local benchmark runs from DuckDB:
 
 ```bash
-# Terminal 1 - backend
-uvicorn api.main:app --reload
+# Safe: remove only runs with no result data (e.g. left over from schema migrations)
+py -m cli.main cleanup-runs --stale-only
 
-# Terminal 2 - frontend
+# Nuclear: remove all local run data
+py -m cli.main cleanup-runs --all
+```
+
+---
+
+## Web dashboard
+
+```bash
+# Terminal 1 -- backend
+py -m uvicorn api.main:app --reload
+
+# Terminal 2 -- frontend
 cd frontend
 npm install
 npm run dev
 # Open http://localhost:3000
 ```
 
-### Docker
-
-```bash
-docker-compose up --build
-# API: http://localhost:8000
-# UI:  http://localhost:3000
-```
+Sidebar navigation:
+- Dashboard -- returns to the main view
+- API Docs -- opens FastAPI Swagger UI at http://127.0.0.1:8000/docs in a new tab
+- Settings -- not yet implemented (shown as disabled)
 
 ---
 
-## Writing a Test Suite
+## Writing a test suite
 
 ```yaml
 suite:
@@ -169,120 +132,72 @@ models:
   - gpt-4o-mini
 
 judge_model: claude-haiku-4-5-20251001
-parallel_workers: 5
+parallel_workers: 3
+db_path: "./data/results.duckdb"
+failure_threshold: 0.5
 
 defaults:
   system_prompt: |
     You are a helpful assistant. Always cite sources using [1], [2] format.
 
 test_cases:
-  - name: "test_citation_in_long_context"
+  - name: "citation_in_long_context"
     failure_category: instruction_loss
     perturbation: instruction_burial
     perturbation_config:
-      depth: 0.85          # bury instructions 85% deep in context
+      depth: 0.85
       padding_count: 6
     query: "What was Q3 revenue?"
     expected_behavior: "Must include citation markers [1] or [2]"
+    # Add context_depth_levels to populate the degradation curve
+    context_depth_levels: [0.25, 0.5, 0.75, 1.0]
     chunks:
-      - "Q3 revenue was $1.2B, up 15% YoY."
+      - "Q3 revenue was .2B, up 15% YoY."
       - "Operating margin reached 24%."
     validators:
       - type: contains_pattern
-        pattern: "\\[\\d+\\]"
+        pattern: "\[\d+\]"
         description: "Citation markers required"
-    metadata:
-      severity: critical
 ```
+
+### context_depth_levels
+
+When a test case includes context_depth_levels, the runner re-executes it at each
+fraction of the full chunk list (0.25 = first 25% of chunks). Scores are stored in
+the depth_scores table and surface as the degradation curve in the dashboard.
 
 ### Perturbation types
 
-| `perturbation` value | What it does |
+| Value | What it does |
 |---|---|
-| `chunk_shuffle` | Randomly reorders chunks (exposes position bias) |
-| `distractor_injection` | Adds irrelevant chunks (tests retrieval focus) |
-| `conflicting_evidence` | Injects a chunk that contradicts another |
-| `instruction_burial` | Pushes key instructions deep into context |
-| `history_contamination` | Injects false turns into conversation history |
-| `paraphrase_evidence` | Rewrites chunks with synonyms (tests exact vs semantic match) |
+| chunk_shuffle | Reorders chunks randomly |
+| distractor_injection | Injects irrelevant filler chunks |
+| conflicting_evidence | Injects a chunk that contradicts another |
+| instruction_burial | Pushes key instructions deep into context |
+| history_contamination | Injects false turns into conversation history |
+| paraphrase_evidence | Rewrites chunks with synonyms |
 
-### Validator types
+---
 
-| `type` | Config | What it checks |
-|---|---|---|
-| `contains_pattern` | `pattern: regex` | Response matches regex |
-| `not_contains` | `pattern: regex` | Response does NOT match regex |
-| `min_length` | `value: int` | `len(response) >= value` |
-| `max_length` | `value: int` | `len(response) <= value` |
-| `ends_with_punctuation` | — | Response ends with `.!?` |
-| `contains_all` | `value: [str, ...]` | All strings present in response |
+## How evaluation works
+
+Every test runs deterministic rules first. The LLM judge is only called when the
+deterministic score is in the ambiguous band [threshold-0.2, threshold+0.2]
+(default [0.3, 0.7]). This keeps judge API costs low on typical suites.
 
 ---
 
 ## Testing
 
 ```bash
-pytest tests/ -v
+py -m pytest
 ```
 
 ---
 
-## Project Structure
+## Limitations
 
-```
-contextcrash/
-├── core/
-│   ├── models.py          # Pydantic data models
-│   ├── config.py          # YAML DSL loader + perturbation application
-│   ├── runner.py          # Async test runner (asyncio + LiteLLM)
-│   └── storage.py         # DuckDB read/write layer
-├── evaluators/
-│   ├── deterministic.py   # Rule-based validators (8 categories)
-│   ├── llm_judge.py       # LLM-as-judge (Claude, ambiguous cases only)
-│   └── aggregator.py      # Summary + regression delta computation
-├── perturbations/
-│   ├── chunk_shuffle.py
-│   ├── distractor.py
-│   ├── conflicting.py
-│   ├── instruction_burial.py
-│   ├── history_contamination.py
-│   └── paraphrase.py
-├── cli/
-│   └── main.py            # click CLI: run, compare
-├── api/
-│   ├── main.py            # FastAPI app
-│   └── routes/            # /runs, /results endpoints
-├── frontend/
-│   └── src/
-│       ├── App.jsx
-│       └── components/
-│           ├── Heatmap.jsx        # D3.js failure heatmap
-│           ├── ComparisonView.jsx # Regression delta bars
-│           └── RunHistory.jsx     # Sidebar run list
-├── tests/
-├── examples/
-│   └── suite.yaml
-├── docker-compose.yml
-└── requirements.txt
-```
-
----
-
-## How Evaluation Works
-
-Every test runs deterministic rules first. The LLM judge is only called when the deterministic score falls in the ambiguous range `[threshold-0.2, threshold+0.2]` (default `[0.3, 0.7]`). This cuts judge API costs by ~60-80% on typical suites.
-
-```
-test response
-      │
-      ▼
-deterministic rules ──► score < 0.3 ──► FAIL (no judge needed)
-      │
-      ├──► score > 0.7 ──► PASS (no judge needed)
-      │
-      └──► 0.3–0.7 ──► LLM judge ──► final_score
-                              │
-                              └──► |det - judge| > 0.4 ──► disagreement logged
-```
-
-Judge disagreement rates are tracked per run and surfaced in the summary. High disagreement in a category means the deterministic rules need tuning.
+- Included examples use synthetic data and are not suitable for comparing real production workloads.
+- Cost tracking is estimated from a static pricing table in core/runner.py.
+- Degradation curves only appear for test cases with context_depth_levels configured.
+  The basic suite.yaml does not include them; advanced_suite.yaml does.
