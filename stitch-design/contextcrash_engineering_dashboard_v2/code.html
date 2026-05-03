@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&amp;family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "surface-container-highest": "#353437",
+                    "on-secondary-fixed-variant": "#7e2c00",
+                    "on-surface-variant": "#c2c6d5",
+                    "secondary-fixed-dim": "#ffb597",
+                    "on-tertiary-container": "#ffffff",
+                    "secondary-container": "#9d3900",
+                    "on-primary": "#002f68",
+                    "error": "#ffb4ab",
+                    "primary": "#acc7ff",
+                    "surface-tint": "#acc7ff",
+                    "surface-container-high": "#2a2a2c",
+                    "on-error": "#690005",
+                    "primary-container": "#3274d9",
+                    "tertiary-fixed": "#e2e2e2",
+                    "on-tertiary": "#2f3131",
+                    "on-secondary": "#591d00",
+                    "on-error-container": "#ffdad6",
+                    "secondary": "#ffb597",
+                    "tertiary-fixed-dim": "#c6c6c7",
+                    "primary-fixed-dim": "#acc7ff",
+                    "on-surface": "#e5e1e4",
+                    "inverse-surface": "#e5e1e4",
+                    "secondary-fixed": "#ffdbcd",
+                    "inverse-primary": "#005bbf",
+                    "surface-dim": "#131315",
+                    "on-background": "#e5e1e4",
+                    "tertiary-container": "#757676",
+                    "on-primary-fixed": "#001a40",
+                    "background": "#131315",
+                    "on-primary-container": "#ffffff",
+                    "outline-variant": "#424753",
+                    "outline": "#8c909e",
+                    "surface-container-low": "#1c1b1d",
+                    "surface": "#131315",
+                    "on-secondary-fixed": "#360f00",
+                    "surface-container": "#201f22",
+                    "on-tertiary-fixed": "#1a1c1c",
+                    "surface-container-lowest": "#0e0e10",
+                    "primary-fixed": "#d7e2ff",
+                    "surface-bright": "#39393b",
+                    "tertiary": "#c6c6c7",
+                    "on-primary-fixed-variant": "#004492",
+                    "error-container": "#93000a",
+                    "inverse-on-surface": "#313032",
+                    "on-secondary-container": "#ffc4ac",
+                    "surface-variant": "#353437",
+                    "on-tertiary-fixed-variant": "#454747"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.125rem",
+                    "lg": "0.25rem",
+                    "xl": "0.5rem",
+                    "full": "0.75rem"
+            },
+            "spacing": {
+                    "xs": "4px",
+                    "lg": "24px",
+                    "unit": "4px",
+                    "sm": "8px",
+                    "md": "16px",
+                    "margin": "24px",
+                    "xl": "48px",
+                    "gutter": "12px"
+            },
+            "fontFamily": {
+                    "h2": ["Inter"],
+                    "label-caps": ["Inter"],
+                    "h1": ["Inter"],
+                    "body-base": ["Inter"],
+                    "h3": ["Inter"],
+                    "body-sm": ["Inter"],
+                    "mono-data": ["monospace"]
+            },
+            "fontSize": {
+                    "h2": ["18px", {"lineHeight": "24px", "letterSpacing": "-0.01em", "fontWeight": "600"}],
+                    "label-caps": ["11px", {"lineHeight": "14px", "letterSpacing": "0.05em", "fontWeight": "600"}],
+                    "h1": ["24px", {"lineHeight": "32px", "letterSpacing": "-0.02em", "fontWeight": "600"}],
+                    "body-base": ["13px", {"lineHeight": "18px", "fontWeight": "400"}],
+                    "h3": ["14px", {"lineHeight": "20px", "fontWeight": "600"}],
+                    "body-sm": ["12px", {"lineHeight": "16px", "fontWeight": "400"}],
+                    "mono-data": ["12px", {"lineHeight": "16px", "fontWeight": "400"}]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+        body { background-color: #0d0d0e; color: #E5E1E4; }
+        .material-symbols-outlined { font-size: 18px; font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
+        ::-webkit-scrollbar { width: 4px; }
+        ::-webkit-scrollbar-track { background: #0d0d0e; }
+        ::-webkit-scrollbar-thumb { background: #27272A; border-radius: 2px; }
+        .heatmap-cell { border: 1px solid #0d0d0e; }
+        .grid-header { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: #71717a; border-bottom: 1px solid #27272a; padding-bottom: 4px; }
+    </style>
+</head>
+<body class="font-body-base overflow-hidden selection:bg-primary-container selection:text-white">
+<!-- TopAppBar -->
+<header class="fixed top-0 w-full z-50 flex justify-between items-center px-4 h-12 bg-[#0d0d0e] border-b border-zinc-800/80 font-['Inter'] text-sm tracking-tight">
+<div class="flex items-center gap-6">
+<span class="text-lg font-black tracking-tighter text-zinc-100 flex items-center gap-2">
+<span class="material-symbols-outlined text-primary leading-none">terminal</span>
+                ContextCrash
+            </span>
+<div class="flex items-center gap-2 bg-zinc-900 border border-zinc-800 px-3 py-1 rounded">
+<span class="text-zinc-500 text-[10px] font-semibold uppercase tracking-wider">Active Workspace:</span>
+<span class="text-zinc-200 font-medium text-xs">Engineering Labs</span>
+<span class="material-symbols-outlined text-zinc-600 text-sm">expand_more</span>
+</div>
+</div>
+<div class="flex items-center gap-4">
+<div class="flex items-center gap-3">
+<span class="text-zinc-500 text-[10px] font-bold uppercase tracking-widest">Compare Mode</span>
+<button class="w-8 h-4 bg-zinc-800 rounded-full relative transition-colors" onclick="this.classList.toggle('bg-primary')">
+<div class="absolute left-0.5 top-0.5 w-3 h-3 bg-white rounded-full transition-transform translate-x-4"></div>
+</button>
+</div>
+<div class="h-4 w-[1px] bg-zinc-800"></div>
+<div class="flex gap-4">
+<span class="material-symbols-outlined text-zinc-500 hover:text-zinc-100 cursor-pointer transition-colors">search</span>
+<span class="material-symbols-outlined text-zinc-500 hover:text-zinc-100 cursor-pointer transition-colors">notifications</span>
+<span class="material-symbols-outlined text-zinc-500 hover:text-zinc-100 cursor-pointer transition-colors">settings</span>
+</div>
+<img alt="User profile" class="w-6 h-6 rounded border border-zinc-700" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCUtMI72jLYlbSx3r1LIZ-62exHwRtvfhX9kAVerYHjCu_Zdl7HByGT0gaEh6-XpgTkmZBbPxzp_kom4JZC3MyLUAt-W-D5A-EGNlZiQT5ppjEszgf8MYe4TxYZzthl7j3_6lUU-vD-pKiknnflm96lkQCi7RDGnzIbiUEK-7d3NYiZuO-HUm1N2uGgWykg43u9MPJvYBa6djEGf2lzlmDGs9ZYMSBE20JN0zAUiN4J1KDq-B_0D9pyMwBePVqj4t1fN7ejlbDWdec"/>
+</div>
+</header>
+<!-- SideNavBar -->
+<nav class="fixed left-0 top-0 h-full z-40 flex flex-col pt-12 w-60 bg-[#0d0d0e] border-r border-zinc-800/80 transition-all duration-200">
+<div class="p-4 mt-2">
+<div class="flex items-center gap-3 p-2 bg-zinc-900 border border-zinc-800 rounded">
+<div class="w-7 h-7 bg-primary-container/20 border border-primary-container/40 rounded flex items-center justify-center">
+<span class="material-symbols-outlined text-primary text-[16px]">monitoring</span>
+</div>
+<div class="flex flex-col">
+<span class="text-zinc-100 font-bold text-[11px] uppercase tracking-wider">Metrics Console</span>
+<span class="text-zinc-600 text-[10px] font-mono">cluster-us-east-1</span>
+</div>
+</div>
+</div>
+<div class="mt-2 flex flex-col px-2">
+<div class="px-3 py-2 text-zinc-500 text-[10px] font-bold uppercase tracking-widest">Recent Runs</div>
+<div class="bg-zinc-900/50 border-l-2 border-primary py-2.5 px-3 flex justify-between items-center cursor-pointer mb-1">
+<div class="flex flex-col">
+<span class="font-bold text-zinc-200 text-xs">GPT-4o Long Context</span>
+<span class="text-[10px] text-zinc-500 font-mono">11-24 14:22 UTC</span>
+</div>
+<span class="text-[10px] bg-green-950/30 text-green-400 px-1.5 py-0.5 rounded border border-green-800/30 font-mono">84.2</span>
+</div>
+<div class="text-zinc-500 py-2.5 px-3 hover:bg-zinc-900 hover:text-zinc-300 flex justify-between items-center cursor-pointer transition-all border-l-2 border-transparent mb-1">
+<div class="flex flex-col">
+<span class="font-semibold text-xs">Llama-3-70B Stress</span>
+<span class="text-[10px] text-zinc-600 font-mono">11-24 10:45 UTC</span>
+</div>
+<span class="text-[10px] bg-yellow-950/30 text-yellow-500 px-1.5 py-0.5 rounded border border-yellow-800/30 font-mono">71.5</span>
+</div>
+<div class="text-zinc-500 py-2.5 px-3 hover:bg-zinc-900 hover:text-zinc-300 flex justify-between items-center cursor-pointer transition-all border-l-2 border-transparent mb-1">
+<div class="flex flex-col">
+<span class="font-semibold text-xs">Gemini 1.5 Pro</span>
+<span class="text-[10px] text-zinc-600 font-mono">11-23 22:12 UTC</span>
+</div>
+<span class="text-[10px] bg-green-950/30 text-green-400 px-1.5 py-0.5 rounded border border-green-800/30 font-mono">89.1</span>
+</div>
+</div>
+<div class="mt-6 flex flex-col px-2">
+<div class="px-3 py-2 text-zinc-500 text-[10px] font-bold uppercase tracking-widest">Dashboards</div>
+<a class="flex items-center gap-3 py-2 px-3 text-zinc-500 hover:text-zinc-200 transition-all rounded" href="#">
+<span class="material-symbols-outlined text-[18px]">grid_view</span>
+<span class="text-[11px] font-semibold uppercase tracking-wider">Overview</span>
+</a>
+<a class="flex items-center gap-3 py-2 px-3 text-zinc-200 bg-zinc-900/50 border border-zinc-800/50 transition-all rounded" href="#">
+<span class="material-symbols-outlined text-[18px]">analytics</span>
+<span class="text-[11px] font-semibold uppercase tracking-wider">Run Analysis</span>
+</a>
+<a class="flex items-center gap-3 py-2 px-3 text-zinc-500 hover:text-zinc-200 transition-all rounded" href="#">
+<span class="material-symbols-outlined text-[18px]">hub</span>
+<span class="text-[11px] font-semibold uppercase tracking-wider">Comparisons</span>
+</a>
+<a class="flex items-center gap-3 py-2 px-3 text-zinc-500 hover:text-zinc-200 transition-all rounded" href="#">
+<span class="material-symbols-outlined text-[18px]">history</span>
+<span class="text-[11px] font-semibold uppercase tracking-wider">Audit Log</span>
+</a>
+</div>
+<div class="mt-auto border-t border-zinc-800 p-2 space-y-1">
+<a class="flex items-center gap-3 py-1.5 px-3 text-zinc-500 hover:text-zinc-300 text-[11px] font-bold uppercase tracking-wider" href="#">
+<span class="material-symbols-outlined text-[16px]">menu_book</span> Documentation
+            </a>
+<a class="flex items-center gap-3 py-1.5 px-3 text-zinc-500 hover:text-zinc-300 text-[11px] font-bold uppercase tracking-wider" href="#">
+<span class="material-symbols-outlined text-[16px]">support</span> Support
+            </a>
+</div>
+</nav>
+<!-- Main Content Area -->
+<main class="ml-60 mt-12 p-6 h-[calc(100vh-48px)] overflow-y-auto bg-[#131315]">
+<!-- Page Header -->
+<div class="flex justify-between items-start mb-6 border-b border-zinc-800/50 pb-6">
+<div>
+<div class="flex items-center gap-3 mb-1">
+<h1 class="text-xl font-bold text-zinc-100 tracking-tight">GPT-4o Long Context Analysis</h1>
+<span class="px-2 py-0.5 bg-primary-container/10 border border-primary-container/30 text-primary text-[10px] font-mono rounded">RUN_COMPLETED</span>
+</div>
+<p class="text-xs text-zinc-500 font-mono">Job ID: dc78-4a11-9f22-1988ef • Owner: platform-eng</p>
+</div>
+<div class="flex gap-2">
+<button class="bg-zinc-900 border border-zinc-800 text-zinc-300 px-3 py-1.5 rounded text-[11px] font-bold uppercase tracking-wider hover:bg-zinc-800 transition-all flex items-center gap-2">
+<span class="material-symbols-outlined !text-[16px]">download</span> Export JSON
+                </button>
+<button class="bg-[#3274D9] text-white px-3 py-1.5 rounded text-[11px] font-bold uppercase tracking-wider hover:brightness-110 transition-all flex items-center gap-2 shadow-lg shadow-blue-900/20">
+<span class="material-symbols-outlined !text-[16px]">refresh</span> Re-run Job
+                </button>
+</div>
+</div>
+<!-- Run Metadata Panel (New Section) -->
+<div class="grid grid-cols-5 gap-0 border border-zinc-800 bg-zinc-900/30 rounded mb-6 overflow-hidden divide-x divide-zinc-800">
+<div class="p-3">
+<div class="text-[10px] text-zinc-500 font-bold uppercase tracking-widest mb-1">Suite Name</div>
+<div class="text-xs font-semibold text-zinc-200">Production Reliability Benchmark</div>
+</div>
+<div class="p-3">
+<div class="text-[10px] text-zinc-500 font-bold uppercase tracking-widest mb-1">Timestamp</div>
+<div class="text-xs font-mono text-zinc-200">2023-11-24 14:22:01 UTC</div>
+</div>
+<div class="p-3">
+<div class="text-[10px] text-zinc-500 font-bold uppercase tracking-widest mb-1">Models Tested</div>
+<div class="text-xs font-semibold text-zinc-200">GPT-4o, Llama-3-70B, Claude 3.5</div>
+</div>
+<div class="p-3">
+<div class="text-[10px] text-zinc-500 font-bold uppercase tracking-widest mb-1">Total Scale</div>
+<div class="text-xs font-semibold text-zinc-200">12,400 Atomic Ops</div>
+</div>
+<div class="p-3 bg-zinc-900/50">
+<div class="text-[10px] text-zinc-500 font-bold uppercase tracking-widest mb-1">Evaluator Type</div>
+<div class="text-xs font-mono text-primary">STRESS_TEST_V4</div>
+</div>
+</div>
+<!-- Metric Grid -->
+<div class="grid grid-cols-4 gap-4 mb-6">
+<div class="bg-zinc-900/50 border border-zinc-800 p-4 rounded">
+<div class="flex justify-between items-start mb-2">
+<div class="text-[10px] text-zinc-500 font-bold uppercase tracking-widest">Reliability Score</div>
+<div class="text-[10px] text-error flex items-center font-mono font-bold">
+<span class="material-symbols-outlined !text-[12px]">arrow_downward</span> 1.2%
+                    </div>
+</div>
+<div class="text-2xl font-black text-zinc-100 font-mono tracking-tighter">84.2<span class="text-zinc-500 text-lg">%</span></div>
+</div>
+<div class="bg-zinc-900/50 border border-zinc-800 p-4 rounded">
+<div class="text-[10px] text-zinc-500 font-bold uppercase tracking-widest mb-2">Total Samples</div>
+<div class="text-2xl font-black text-zinc-100 font-mono tracking-tighter">12,400</div>
+</div>
+<div class="bg-zinc-900/50 border border-zinc-800 p-4 rounded">
+<div class="text-[10px] text-zinc-500 font-bold uppercase tracking-widest mb-2">Model Coverage</div>
+<div class="text-2xl font-black text-zinc-100 font-mono tracking-tighter">12 <span class="text-zinc-500 text-lg">Agents</span></div>
+</div>
+<div class="bg-zinc-900/50 border border-zinc-800 p-4 rounded">
+<div class="text-[10px] text-zinc-500 font-bold uppercase tracking-widest mb-2">Active Regressions</div>
+<div class="text-2xl font-black text-error font-mono tracking-tighter">08</div>
+</div>
+</div>
+<!-- Bento Grid Analysis: Central Heatmap -->
+<div class="grid grid-cols-12 gap-6">
+<!-- Failure Heatmap (Primary Feature) -->
+<div class="col-span-12 lg:col-span-12 bg-zinc-900/50 border border-zinc-800 rounded p-6">
+<div class="flex justify-between items-center mb-8">
+<div>
+<h3 class="text-sm font-bold text-zinc-100 uppercase tracking-widest">Context Window Reliability Heatmap</h3>
+<p class="text-xs text-zinc-500 mt-1">Error density correlation across context depth and evaluation category</p>
+</div>
+<div class="flex items-center gap-4 border border-zinc-800 px-4 py-2 bg-zinc-900 rounded">
+<span class="text-[10px] font-bold text-zinc-500 tracking-widest">LEGEND</span>
+<div class="flex gap-3 text-[10px] font-mono">
+<span class="flex items-center gap-1.5"><span class="w-3 h-3 bg-green-950/40 border border-green-800/30"></span> NOMINAL</span>
+<span class="flex items-center gap-1.5"><span class="w-3 h-3 bg-yellow-900/40 border border-yellow-700/30"></span> ELEVATED</span>
+<span class="flex items-center gap-1.5"><span class="w-3 h-3 bg-orange-900/40 border border-orange-700/30"></span> WARNING</span>
+<span class="flex items-center gap-1.5"><span class="w-3 h-3 bg-red-900/80 border border-red-700/30"></span> CRITICAL</span>
+</div>
+</div>
+</div>
+<div class="grid grid-cols-[200px_repeat(4,1fr)] gap-px bg-zinc-800 p-px">
+<!-- Column Headers -->
+<div class="bg-zinc-900 p-4"></div>
+<div class="bg-zinc-900 p-4 text-center text-[10px] font-bold text-zinc-500 tracking-widest">0-32K (25%)</div>
+<div class="bg-zinc-900 p-4 text-center text-[10px] font-bold text-zinc-500 tracking-widest">32-64K (50%)</div>
+<div class="bg-zinc-900 p-4 text-center text-[10px] font-bold text-zinc-500 tracking-widest">64-96K (75%)</div>
+<div class="bg-zinc-900 p-4 text-center text-[10px] font-bold text-zinc-500 tracking-widest">96-128K (100%)</div>
+<!-- Row 1 -->
+<div class="bg-zinc-900 p-4 text-xs font-bold text-zinc-400">Needle-in-Haystack</div>
+<div class="heatmap-cell bg-green-950/20 text-green-500 text-xs flex items-center justify-center font-mono p-4">0.2%</div>
+<div class="heatmap-cell bg-green-950/20 text-green-500 text-xs flex items-center justify-center font-mono p-4">0.4%</div>
+<div class="heatmap-cell bg-yellow-900/20 text-yellow-500 text-xs flex items-center justify-center font-mono p-4">1.8%</div>
+<div class="heatmap-cell bg-red-900 text-white text-xs flex items-center justify-center font-mono p-4">14.2%</div>
+<!-- Row 2 -->
+<div class="bg-zinc-900 p-4 text-xs font-bold text-zinc-400">Multi-hop Reasoning</div>
+<div class="heatmap-cell bg-yellow-900/20 text-yellow-500 text-xs flex items-center justify-center font-mono p-4">2.1%</div>
+<div class="heatmap-cell bg-yellow-900/40 text-yellow-600 text-xs flex items-center justify-center font-mono p-4">5.5%</div>
+<div class="heatmap-cell bg-orange-900/40 text-orange-400 text-xs flex items-center justify-center font-mono p-4">9.8%</div>
+<div class="heatmap-cell bg-red-800 text-white text-xs flex items-center justify-center font-mono p-4">22.1%</div>
+<!-- Row 3 -->
+<div class="bg-zinc-900 p-4 text-xs font-bold text-zinc-400">Hallucination Index</div>
+<div class="heatmap-cell bg-yellow-900/20 text-yellow-500 text-xs flex items-center justify-center font-mono p-4">3.4%</div>
+<div class="heatmap-cell bg-orange-900/40 text-orange-400 text-xs flex items-center justify-center font-mono p-4">8.2%</div>
+<div class="heatmap-cell bg-red-900/60 text-white text-xs flex items-center justify-center font-mono p-4">12.5%</div>
+<div class="heatmap-cell bg-red-900 text-white text-xs flex items-center justify-center font-mono p-4">28.9%</div>
+<!-- Row 4 -->
+<div class="bg-zinc-900 p-4 text-xs font-bold text-zinc-400">Logical Consistency</div>
+<div class="heatmap-cell bg-yellow-900/20 text-yellow-500 text-xs flex items-center justify-center font-mono p-4">2.2%</div>
+<div class="heatmap-cell bg-yellow-900/40 text-yellow-500 text-xs flex items-center justify-center font-mono p-4">4.8%</div>
+<div class="heatmap-cell bg-orange-900/40 text-orange-400 text-xs flex items-center justify-center font-mono p-4">7.9%</div>
+<div class="heatmap-cell bg-orange-900/80 text-white text-xs flex items-center justify-center font-mono p-4">11.4%</div>
+</div>
+</div>
+<!-- Degradation Curve -->
+<div class="col-span-12 lg:col-span-5 bg-zinc-900/50 border border-zinc-800 p-6 rounded">
+<div class="flex justify-between items-center mb-8">
+<h3 class="text-sm font-bold text-zinc-100 uppercase tracking-widest">Degradation Curve</h3>
+<div class="flex gap-4">
+<span class="flex items-center gap-2 text-[10px] text-zinc-400 font-bold tracking-wider"><span class="w-3 h-0.5 bg-[#3274D9]"></span> GPT-4O</span>
+<span class="flex items-center gap-2 text-[10px] text-zinc-500 font-bold tracking-wider"><span class="w-3 h-0.5 bg-zinc-600 border border-dashed"></span> LLAMA-3</span>
+</div>
+</div>
+<div class="h-64 relative border-l border-b border-zinc-800 mb-6">
+<div class="absolute -left-8 top-0 text-[10px] text-zinc-600 font-mono">100%</div>
+<div class="absolute -left-8 bottom-0 text-[10px] text-zinc-600 font-mono">0%</div>
+<svg class="w-full h-full" preserveaspectratio="none" viewbox="0 0 400 200">
+<line stroke="#27272A" stroke-width="0.5" x1="0" x2="400" y1="50" y2="50"></line>
+<line stroke="#27272A" stroke-width="0.5" x1="0" x2="400" y1="100" y2="100"></line>
+<line stroke="#27272A" stroke-width="0.5" x1="0" x2="400" y1="150" y2="150"></line>
+<path d="M 0,20 L 100,45 L 200,85 L 300,140 L 400,185" fill="none" stroke="#52525B" stroke-dasharray="4" stroke-width="1.5"></path>
+<path d="M 0,10 L 100,15 L 200,25 L 300,55 L 400,110" fill="none" stroke="#3274D9" stroke-width="2.5"></path>
+<circle cx="400" cy="110" fill="#3274D9" r="3.5"></circle>
+</svg>
+<div class="flex justify-between mt-3 text-[10px] text-zinc-500 font-mono">
+<span>0k</span><span>32k</span><span>64k</span><span>96k</span><span>128k</span>
+</div>
+</div>
+<div class="p-3 bg-zinc-900 border border-zinc-800 rounded">
+<div class="flex items-center gap-2 mb-2 text-red-500">
+<span class="material-symbols-outlined !text-[16px]">report_problem</span>
+<span class="text-[10px] font-bold uppercase tracking-widest">Critical Alert</span>
+</div>
+<p class="text-xs text-zinc-300 leading-tight">
+                        Catastrophic degradation observed at <span class="font-mono text-white">96k tokens</span>. Multi-hop reasoning delta: <span class="text-red-400 font-bold">-42%</span> vs baseline.
+                    </p>
+</div>
+</div>
+<!-- Recent Errors Table -->
+<div class="col-span-12 lg:col-span-7 bg-zinc-900/50 border border-zinc-800 rounded overflow-hidden">
+<div class="px-5 py-4 border-b border-zinc-800 flex justify-between items-center bg-zinc-900/40">
+<h3 class="text-sm font-bold text-zinc-100 uppercase tracking-widest">Live Regression Log</h3>
+<div class="text-[10px] font-mono text-zinc-500">8 DETECTED REGRESSIONS</div>
+</div>
+<div class="overflow-x-auto">
+<table class="w-full text-left">
+<thead>
+<tr class="text-[10px] text-zinc-500 font-bold uppercase tracking-widest bg-zinc-900/20 border-b border-zinc-800">
+<th class="px-5 py-3">Trace ID</th>
+<th class="px-5 py-3">Category</th>
+<th class="px-5 py-3">Scale</th>
+<th class="px-5 py-3">Expected / Actual</th>
+<th class="px-5 py-3 text-right">State</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-zinc-800/50">
+<tr class="hover:bg-zinc-800/20 transition-colors">
+<td class="px-5 py-4 text-[11px] font-mono text-zinc-400">CX-8842</td>
+<td class="px-5 py-4 text-[11px] text-zinc-300 font-semibold">Multi-hop</td>
+<td class="px-5 py-4 text-[11px] text-zinc-500 font-mono">112k</td>
+<td class="px-5 py-4">
+<div class="flex items-center gap-2">
+<span class="text-[11px] text-green-500/80 font-mono">Entity-A</span>
+<span class="material-symbols-outlined text-zinc-700 text-[12px]">arrow_forward</span>
+<span class="text-[11px] text-red-500 font-bold font-mono">Entity-C</span>
+</div>
+</td>
+<td class="px-5 py-4 text-right">
+<span class="bg-red-500/10 text-red-500 text-[9px] font-black px-2 py-0.5 rounded border border-red-500/30">REGRESSION</span>
+</td>
+</tr>
+<tr class="hover:bg-zinc-800/20 transition-colors">
+<td class="px-5 py-4 text-[11px] font-mono text-zinc-400">CX-8841</td>
+<td class="px-5 py-4 text-[11px] text-zinc-300 font-semibold">Search</td>
+<td class="px-5 py-4 text-[11px] text-zinc-500 font-mono">128k</td>
+<td class="px-5 py-4">
+<div class="flex items-center gap-2">
+<span class="text-[11px] text-green-500/80 font-mono">True</span>
+<span class="material-symbols-outlined text-zinc-700 text-[12px]">arrow_forward</span>
+<span class="text-[11px] text-red-500 font-bold font-mono">False</span>
+</div>
+</td>
+<td class="px-5 py-4 text-right">
+<span class="bg-red-500/10 text-red-500 text-[9px] font-black px-2 py-0.5 rounded border border-red-500/30">REGRESSION</span>
+</td>
+</tr>
+<tr class="hover:bg-zinc-800/20 transition-colors">
+<td class="px-5 py-4 text-[11px] font-mono text-zinc-400">CX-8839</td>
+<td class="px-5 py-4 text-[11px] text-zinc-300 font-semibold">Consistency</td>
+<td class="px-5 py-4 text-[11px] text-zinc-500 font-mono">32k</td>
+<td class="px-5 py-4">
+<div class="flex items-center gap-2 text-[11px]">
+<span class="text-green-500/80 font-mono">Consistent</span>
+<span class="material-symbols-outlined text-zinc-700 text-[12px]">arrow_forward</span>
+<span class="text-orange-500 font-bold font-mono">Partial</span>
+</div>
+</td>
+<td class="px-5 py-4 text-right">
+<span class="bg-orange-500/10 text-orange-500 text-[9px] font-black px-2 py-0.5 rounded border border-orange-500/30">IMPROVED</span>
+</td>
+</tr>
+<tr class="hover:bg-zinc-800/20 transition-colors">
+<td class="px-5 py-4 text-[11px] font-mono text-zinc-400">CX-8830</td>
+<td class="px-5 py-4 text-[11px] text-zinc-300 font-semibold">Extraction</td>
+<td class="px-5 py-4 text-[11px] text-zinc-500 font-mono">64k</td>
+<td class="px-5 py-4">
+<div class="flex items-center gap-2 text-[11px]">
+<span class="text-green-500/80 font-mono">Valid</span>
+<span class="material-symbols-outlined text-zinc-700 text-[12px]">check_circle</span>
+<span class="text-green-500 font-bold font-mono">Valid</span>
+</div>
+</td>
+<td class="px-5 py-4 text-right">
+<span class="bg-green-500/10 text-green-500 text-[9px] font-black px-2 py-0.5 rounded border border-green-500/30">OK</span>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</div>
+</main>
+<!-- Background Blueprint Graphic (Modified for minimal/professional feel) -->
+<div class="fixed bottom-0 right-0 pointer-events-none opacity-[0.03] select-none">
+<svg height="400" viewbox="0 0 400 400" width="400" xmlns="http://www.w3.org/2000/svg">
+<defs>
+<pattern height="40" id="grid" patternunits="userSpaceOnUse" width="40">
+<path d="M 40 0 L 0 0 0 40" fill="none" stroke="white" stroke-width="1"></path>
+</pattern>
+</defs>
+<rect fill="url(#grid)" height="100%" width="100%"></rect>
+</svg>
+</div>
+</body></html>

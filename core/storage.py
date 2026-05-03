@@ -2,11 +2,29 @@ from __future__ import annotations
 
 import json
 import os
+import sys
 from typing import Dict, List, Optional
 
 import duckdb
 
 from core.models import DepthScore, ModelCostSummary, RunSummary, TestResult
+
+# Canonical column sets — any deviation from these means the on-disk schema is stale.
+# CREATE TABLE IF NOT EXISTS never alters an existing table, so we must detect and
+# drop stale tables before recreating them.
+_EXPECTED_TEST_RESULT_COLS = frozenset({
+    "id", "run_id", "test_case_id", "test_name", "failure_category",
+    "perturbation_type", "model", "response", "deterministic_score",
+    "llm_judge_score", "final_score", "failed", "failure_reason",
+    "judge_rule_disagreement", "disputed", "deterministic_reason",
+    "judge_reason", "latency_ms", "prompt_tokens", "completion_tokens",
+    "tokens_used", "estimated_cost_usd", "timestamp",
+})
+_EXPECTED_RUN_SUMMARY_COLS = frozenset({
+    "run_id", "suite_name", "model", "total_tests", "failed_tests",
+    "failure_rate", "failure_by_category", "avg_latency_ms",
+    "judge_disagreement_rate", "disputed_count", "total_cost_usd", "created_at",
+})
 
 
 class ResultStorage:
@@ -29,8 +47,41 @@ class ResultStorage:
         cols = [d[0] for d in cursor.description]
         return [dict(zip(cols, row)) for row in cursor.fetchall()]
 
+    def _migrate_stale_schema(self, conn: duckdb.DuckDBPyConnection) -> None:
+        """Drop any table whose column set no longer matches the expected schema.
+
+        CREATE TABLE IF NOT EXISTS never alters an existing table, so a DB created with an
+        older schema will silently keep the wrong columns, causing BinderExceptions at
+        INSERT time. Detect stale tables and drop them so the subsequent CREATE TABLE
+        rebuilds them correctly. Existing run data is lost, but ContextCrash local dev
+        databases are not treated as durable storage.
+        """
+        tables = {r[0] for r in conn.execute(
+            "SELECT table_name FROM information_schema.tables WHERE table_schema='main'"
+        ).fetchall()}
+
+        stale_checks = {
+            "test_results": _EXPECTED_TEST_RESULT_COLS,
+            "run_summaries": _EXPECTED_RUN_SUMMARY_COLS,
+        }
+        for table, expected in stale_checks.items():
+            if table not in tables:
+                continue
+            existing = {r[0] for r in conn.execute(
+                f"SELECT column_name FROM information_schema.columns WHERE table_name='{table}'"
+            ).fetchall()}
+            if existing != expected:
+                print(
+                    f"[storage] Stale {table} schema detected "
+                    f"({len(existing)} cols, expected {len(expected)}). "
+                    "Dropping and recreating — existing rows are lost.",
+                    file=sys.stderr,
+                )
+                conn.execute(f"DROP TABLE {table}")
+
     def _init_schema(self) -> None:
         with self._conn() as conn:
+            self._migrate_stale_schema(conn)
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS test_runs (
                     run_id     VARCHAR PRIMARY KEY,
@@ -115,15 +166,24 @@ class ResultStorage:
     def create_run(self, run_id: str, suite_name: str, models: list) -> None:
         with self._conn() as conn:
             conn.execute(
-                "INSERT INTO test_runs VALUES (?, ?, ?, CURRENT_TIMESTAMP)",
+                "INSERT INTO test_runs (run_id, suite_name, models_json, created_at)"
+                " VALUES (?, ?, ?, CURRENT_TIMESTAMP)",
                 [run_id, suite_name, json.dumps(models)],
             )
 
     async def save_result(self, result: TestResult) -> None:
         with self._conn() as conn:
             conn.execute(
-                """INSERT INTO test_results VALUES
-                   (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                """INSERT INTO test_results (
+                    id, run_id, test_case_id, test_name,
+                    failure_category, perturbation_type, model,
+                    response, deterministic_score, llm_judge_score,
+                    final_score, failed, failure_reason,
+                    judge_rule_disagreement, disputed,
+                    deterministic_reason, judge_reason,
+                    latency_ms, prompt_tokens, completion_tokens,
+                    tokens_used, estimated_cost_usd, timestamp
+                ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
                 [
                     result.id, result.run_id, result.test_case_id, result.test_name,
                     result.failure_category, result.perturbation_type, result.model,
@@ -139,8 +199,13 @@ class ResultStorage:
     def save_summary(self, summary: RunSummary) -> None:
         with self._conn() as conn:
             conn.execute(
-                """INSERT OR REPLACE INTO run_summaries VALUES
-                   (?,?,?,?,?,?,?,?,?,?,?,CURRENT_TIMESTAMP)""",
+                """INSERT OR REPLACE INTO run_summaries (
+                    run_id, suite_name, model,
+                    total_tests, failed_tests, failure_rate,
+                    failure_by_category, avg_latency_ms,
+                    judge_disagreement_rate, disputed_count,
+                    total_cost_usd, created_at
+                ) VALUES (?,?,?,?,?,?,?,?,?,?,?,CURRENT_TIMESTAMP)""",
                 [
                     summary.run_id, summary.suite_name, summary.model,
                     summary.total_tests, summary.failed_tests, summary.failure_rate,
@@ -153,8 +218,10 @@ class ResultStorage:
     def save_model_cost_summary(self, s: ModelCostSummary) -> None:
         with self._conn() as conn:
             conn.execute(
-                """INSERT OR REPLACE INTO model_cost_summaries VALUES
-                   (?,?,?,?,?,?,?)""",
+                """INSERT OR REPLACE INTO model_cost_summaries (
+                    run_id, model, failure_category,
+                    failure_rate, avg_score, estimated_cost_usd, test_count
+                ) VALUES (?,?,?,?,?,?,?)""",
                 [s.run_id, s.model, s.failure_category,
                  s.failure_rate, s.avg_score, s.estimated_cost_usd, s.test_count],
             )
@@ -162,7 +229,10 @@ class ResultStorage:
     async def save_depth_score(self, ds: DepthScore) -> None:
         with self._conn() as conn:
             conn.execute(
-                """INSERT OR REPLACE INTO depth_scores VALUES (?,?,?,?,?,?,?)""",
+                """INSERT OR REPLACE INTO depth_scores (
+                    run_id, test_case_id, model, depth_level,
+                    score, failure_category, failed
+                ) VALUES (?,?,?,?,?,?,?)""",
                 [ds.run_id, ds.test_case_id, ds.model, ds.depth_level,
                  ds.score, ds.failure_category, ds.failed],
             )

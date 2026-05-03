@@ -268,7 +268,7 @@ def _print_heatmap(summaries: Dict[str, RunSummary]) -> None:
 
     console.print(table)
     console.print(
-        "  [green]■ <20%[/green]  [yellow]■ 20-50%[/yellow]  [red]■ >50%[/red]   "
+        "  [green]* <20%[/green]  [yellow]* 20-50%[/yellow]  [red]* >50%[/red]   "
         + "  ".join(f"{v}={k}" for k, v in CAT_SHORT.items())
     )
 
@@ -313,7 +313,7 @@ def _print_comparison(data: dict, baseline_name: str, candidate_name: str) -> No
 
         console.print(f"\n[bold cyan]{model}[/bold cyan]")
         console.print(
-            f"  Overall: {baseline_name} [yellow]{d['baseline_failure_rate']:.1%}[/yellow] → "
+            f"  Overall: {baseline_name} [yellow]{d['baseline_failure_rate']:.1%}[/yellow] -> "
             f"{candidate_name} [yellow]{d['candidate_failure_rate']:.1%}[/yellow]  "
             f"delta=[{delta_color}]{overall_delta:+.1%}[/{delta_color}]"
         )
@@ -329,7 +329,7 @@ def _print_comparison(data: dict, baseline_name: str, candidate_name: str) -> No
             if abs(delta) < 0.01:
                 continue
             color = "red" if delta > 0 else "green"
-            signal = "▲ regression" if delta > 0 else "▼ improvement"
+            signal = "+ regression" if delta > 0 else "- improvement"
             status = "[bold red]REGRESSION[/bold red]" if delta > 0 else "[bold green]OK[/bold green]"
             table.add_row(
                 cat,

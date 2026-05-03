@@ -4,11 +4,12 @@ not actual model responses. The evaluator tests cover scoring correctness.
 """
 import asyncio
 import pytest
+import duckdb
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from core.models import FailureCategory, PerturbationType, RunConfig, TestCase
+from core.models import FailureCategory, PerturbationType, RunConfig, TestCase, TestResult
 from core.runner import TestRunner
-from core.storage import ResultStorage
+from core.storage import ResultStorage, _EXPECTED_TEST_RESULT_COLS, _EXPECTED_RUN_SUMMARY_COLS
 
 
 def make_config(tmp_db, test_cases=None):
@@ -390,3 +391,153 @@ class TestChunkOrdering:
         # config says reversed: gamma, beta, alpha
         assert "[Chunk 1]\ngamma" in content
         assert "[Chunk 3]\nalpha" in content
+
+
+# ── Schema regression tests ───────────────────────────────────────────────────
+
+def test_save_result_no_column_mismatch(tmp_path):
+    """Regression: TestResult with all 23 fields saves without BinderException."""
+    db_path = str(tmp_path / "no_mismatch.duckdb")
+    storage = ResultStorage(db_path)
+    storage.create_run("r1", "suite", ["gpt-4o"])
+    result = TestResult(
+        run_id="r1",
+        test_case_id="tc1",
+        test_name="test",
+        failure_category="instruction_loss",
+        perturbation_type="chunk_shuffle",
+        model="gpt-4o",
+        response="ok",
+        final_score=0.8,
+        failed=False,
+        latency_ms=100.0,
+        prompt_tokens=50,
+        completion_tokens=20,
+        tokens_used=70,
+        estimated_cost_usd=0.001,
+    )
+    asyncio.run(storage.save_result(result))
+    rows = storage.get_results_for_run("r1")
+    assert len(rows) == 1
+    assert rows[0]["model"] == "gpt-4o"
+    assert rows[0]["prompt_tokens"] == 50
+    assert rows[0]["estimated_cost_usd"] == pytest.approx(0.001)
+
+
+def test_stale_17col_schema_migrated_on_init(tmp_path):
+    """When a DB with the old 17-column test_results exists, ResultStorage rebuilds it."""
+    db_path = str(tmp_path / "stale.duckdb")
+
+    # Simulate the old 17-column schema that caused the BinderException
+    with duckdb.connect(db_path) as conn:
+        conn.execute("""
+            CREATE TABLE test_results (
+                id                    VARCHAR PRIMARY KEY,
+                run_id                VARCHAR NOT NULL,
+                test_case_id          VARCHAR NOT NULL,
+                test_name             VARCHAR NOT NULL,
+                failure_category      VARCHAR NOT NULL,
+                perturbation_type     VARCHAR NOT NULL,
+                model                 VARCHAR NOT NULL,
+                response              TEXT,
+                deterministic_score   DOUBLE,
+                llm_judge_score       DOUBLE,
+                final_score           DOUBLE NOT NULL,
+                failed                BOOLEAN NOT NULL,
+                failure_reason        VARCHAR,
+                judge_rule_disagreement BOOLEAN,
+                latency_ms            DOUBLE,
+                tokens_used           INTEGER,
+                timestamp             TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+
+    # ResultStorage.__init__ must detect and fix the stale schema
+    storage = ResultStorage(db_path)
+
+    with duckdb.connect(db_path) as conn:
+        cols = {r[0] for r in conn.execute(
+            "SELECT column_name FROM information_schema.columns WHERE table_name='test_results'"
+        ).fetchall()}
+
+    assert cols == _EXPECTED_TEST_RESULT_COLS, (
+        f"Schema mismatch after migration: got {sorted(cols)}"
+    )
+
+
+def test_stale_run_summaries_schema_migrated_on_init(tmp_path):
+    """When run_summaries has the old 10-column schema, ResultStorage rebuilds it."""
+    db_path = str(tmp_path / "stale_summaries.duckdb")
+
+    with duckdb.connect(db_path) as conn:
+        conn.execute("""
+            CREATE TABLE run_summaries (
+                run_id                  VARCHAR NOT NULL,
+                suite_name              VARCHAR NOT NULL,
+                model                   VARCHAR NOT NULL,
+                total_tests             INTEGER,
+                failed_tests            INTEGER,
+                failure_rate            DOUBLE,
+                failure_by_category     VARCHAR,
+                avg_latency_ms          DOUBLE,
+                judge_disagreement_rate DOUBLE,
+                created_at              TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (run_id, model)
+            )
+        """)
+
+    storage = ResultStorage(db_path)
+
+    with duckdb.connect(db_path) as conn:
+        cols = {r[0] for r in conn.execute(
+            "SELECT column_name FROM information_schema.columns WHERE table_name='run_summaries'"
+        ).fetchall()}
+
+    assert cols == _EXPECTED_RUN_SUMMARY_COLS, (
+        f"run_summaries schema mismatch after migration: got {sorted(cols)}"
+    )
+
+
+def test_save_result_after_stale_schema_migration(tmp_path):
+    """End-to-end: old DB → init → save_result → retrieve succeeds."""
+    db_path = str(tmp_path / "stale_e2e.duckdb")
+
+    with duckdb.connect(db_path) as conn:
+        conn.execute("""
+            CREATE TABLE test_results (
+                id VARCHAR PRIMARY KEY, run_id VARCHAR NOT NULL,
+                test_case_id VARCHAR NOT NULL, test_name VARCHAR NOT NULL,
+                failure_category VARCHAR NOT NULL, perturbation_type VARCHAR NOT NULL,
+                model VARCHAR NOT NULL, response TEXT,
+                deterministic_score DOUBLE, llm_judge_score DOUBLE,
+                final_score DOUBLE NOT NULL, failed BOOLEAN NOT NULL,
+                failure_reason VARCHAR, judge_rule_disagreement BOOLEAN,
+                latency_ms DOUBLE, tokens_used INTEGER,
+                timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+
+    storage = ResultStorage(db_path)
+    storage.create_run("r-migrated", "suite", ["gpt-4o"])
+    result = TestResult(
+        run_id="r-migrated",
+        test_case_id="tc1",
+        test_name="test",
+        failure_category="hallucination_overload",
+        perturbation_type="distractor_injection",
+        model="gpt-4o",
+        response="some response",
+        final_score=0.6,
+        failed=False,
+        latency_ms=200.0,
+        disputed=True,
+        prompt_tokens=30,
+        completion_tokens=10,
+        tokens_used=40,
+        estimated_cost_usd=0.0002,
+    )
+    asyncio.run(storage.save_result(result))
+    rows = storage.get_results_for_run("r-migrated")
+    assert len(rows) == 1
+    assert rows[0]["disputed"] is True
+    assert rows[0]["estimated_cost_usd"] == pytest.approx(0.0002)
