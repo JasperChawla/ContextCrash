@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from pathlib import Path
 from typing import List
 
 from fastapi import APIRouter, HTTPException, Query
@@ -19,7 +20,9 @@ from evaluators.aggregator import compute_regression_delta
 
 router = APIRouter(prefix="/api/runs", tags=["analytics"])
 
-_DEFAULT_DB = "./data/results.duckdb"
+# Absolute path anchored to the project root so the correct database is found
+# regardless of the working directory uvicorn is started from.
+_DEFAULT_DB = str(Path(__file__).parent.parent.parent / "data" / "results.duckdb")
 
 
 def _storage(db_path: str) -> ResultStorage:

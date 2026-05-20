@@ -15,7 +15,7 @@ from evaluators.aggregator import compute_regression_delta
 
 router = APIRouter(prefix="/runs", tags=["runs"])
 
-_DEFAULT_DB = "./data/results.duckdb"
+_DEFAULT_DB = str(Path(__file__).parent.parent.parent / "data" / "results.duckdb")
 
 
 @router.post("/", response_model=dict)

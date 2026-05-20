@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from pathlib import Path
 from typing import List
 
 from fastapi import APIRouter, HTTPException, Query
@@ -9,7 +10,7 @@ from core.storage import ResultStorage
 
 router = APIRouter(prefix="/results", tags=["results"])
 
-_DEFAULT_DB = "./data/results.duckdb"
+_DEFAULT_DB = str(Path(__file__).parent.parent.parent / "data" / "results.duckdb")
 
 
 def _get_storage(db_path: str = _DEFAULT_DB) -> ResultStorage:
